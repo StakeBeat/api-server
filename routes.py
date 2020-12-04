@@ -21,8 +21,8 @@ def register():
 def edit_validators():
     payload = request.json
     indices = payload['indices']
-    validator_svc = ValidatorService()
-    validator_svc.update(indices, current_identity.id)
+    validator_svc = ValidatorService(current_identity.id)
+    validator_svc.update(indices)
     return {'code': HTTPStatus.OK}
 
 
@@ -33,5 +33,8 @@ def protected():
 
 
 @app.route("/api/validators/info", methods=["GET"])
+@jwt_required()
 def validators_info():
-    pass
+    validator_svc = ValidatorService(current_identity.id)
+    info = validator_svc.info()
+    return {'code': HTTPStatus.OK, 'result': info}
