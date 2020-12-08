@@ -12,9 +12,7 @@ class UserService:
 
     def create(self, payload: Dict[str, str]) -> User:
         hashed_pw = bcrypt.hashpw(payload['password'].encode(), bcrypt.gensalt())
-        user = User(
-            username=payload['username'], email=payload['email'], password=hashed_pw.decode()
-        )
+        user = User(username=payload['username'], password=hashed_pw.decode())
 
         with SessionManager.session() as session:
             session.add(user)

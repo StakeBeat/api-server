@@ -38,7 +38,6 @@ class SessionManagerBorg(Borg):
             echo=False,
             use_batch_mode=True,
             connect_args={'connect_timeout': 1},
-            max_overflow=0,
         )
         self.maker = sessionmaker(bind=self.engine)
 

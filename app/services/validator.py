@@ -1,11 +1,12 @@
 import requests
 import time
 from typing import Dict, List, Tuple
-from sqlalchemy import tuple_
 
 from app.services.user import UserService
 from app.models.validator import Validator
 from app.session import SessionManager
+from app.dataclasses.validator import ValidatorDT
+from app.utils.conversion import b64_to_hex
 
 from app import config
 
@@ -17,17 +18,31 @@ class ValidatorService:
         cur_validators = self.user_svc.get_all_validators(user_id)
         self.indices = [validator.indice for validator in cur_validators]
 
-    def update(self, indices: List[str]) -> None:
-        to_delete = set(self.indices) - set(indices)
-        to_add = set(indices) - set(self.indices)
-        validators_to_add = [Validator(indice=i, user_id=self.user_id) for i in to_add]
-        validators_to_del = [(i, self.user_id) for i in to_delete]
-
+    def create(self, indices: List[str]) -> List[ValidatorDT]:
+        resp = requests.get(f'{config.BEACON_RPC_URI}/validators', params={'indices': indices})
+        resp = resp.json()
+        index_to_pubkey = {}
+        for val in resp['validatorList']:
+            index_to_pubkey[val['index']] = b64_to_hex(val['validator']['publicKey'])
+        validators_to_add = [
+            Validator(indice=i, pubkey=index_to_pubkey[i], user_id=self.user_id) for i in indices
+        ]
         with SessionManager.session() as session:
-            session.query(Validator).filter(
-                tuple_(Validator.indice, Validator.user_id).in_(validators_to_del)
-            ).delete(synchronize_session=False)
             session.add_all(validators_to_add)
+
+        return [ValidatorDT.from_model(m) for m in validators_to_add]
+
+    def remove(self, indice: str) -> None:
+        with SessionManager.session() as session:
+            session.query(Validator).filter_by(indice=indice, user_id=self.user_id).delete(
+                synchronize_session=False
+            )
+
+    def get(self) -> List[ValidatorDT]:
+        with SessionManager.session() as session:
+            rows = session.query(Validator).filter_by(user_id=self.user_id).all()
+
+        return [ValidatorDT.from_model(m) for m in rows]
 
     def info(self) -> Dict:
         """Retrieve a validator total balance, balance over time,

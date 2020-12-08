@@ -12,18 +12,37 @@ from app.services.jwt import jwt_required, current_identity
 def register():
     payload = request.json
     user_svc = UserService()
+
     user_svc.create(payload)
     return {'code': HTTPStatus.CREATED}
 
 
-@app.route('/api/validators/edit', methods=['PUT'])
+@app.route('/api/validators', methods=['POST'])
 @jwt_required()
-def edit_validators():
+def add_validators():
     payload = request.json
     indices = payload['indices']
     validator_svc = ValidatorService(current_identity.id)
-    validator_svc.update(indices)
+    validators = validator_svc.create(indices)
+    return {'code': HTTPStatus.CREATED, 'validators': validators}
+
+
+@app.route('/api/validators', methods=['DELETE'])
+@jwt_required()
+def delete_validators():
+    payload = request.json
+    indice = payload['index']
+    validator_svc = ValidatorService(current_identity.id)
+    validator_svc.remove(indice)
     return {'code': HTTPStatus.OK}
+
+
+@app.route('/api/validators', methods=['GET'])
+@jwt_required()
+def get_validators():
+    validator_svc = ValidatorService(current_identity.id)
+    validators = validator_svc.get()
+    return {'code': HTTPStatus.OK, 'validators': validators}
 
 
 @app.route('/protected', methods=["POST"])

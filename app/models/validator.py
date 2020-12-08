@@ -9,4 +9,5 @@ class Validator(BaseModel):
 
     id = Column(Integer, primary_key=True)
     indice = Column(String(16), nullable=False, index=True)
+    pubkey = Column(String(128), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey(User.id), index=True)
