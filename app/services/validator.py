@@ -105,23 +105,6 @@ class ValidatorService:
         """GET eth/v1alpha1/validators/performance
         Retrieve the inclusion distance for each validators assigned to current_user
         """
-
-        def rate_inclusion_dist(distance: int) -> str:
-            if distance == 0:
-                return '?'
-            if distance == 1:
-                return 'A+'
-            if distance >= 2 and distance <= 3:
-                return 'B'
-            if distance >= 4 and distance <= 8:
-                return 'C'
-            if distance >= 9 and distance <= 12:
-                return 'D'
-            if distance >= 13 <= 1000:
-                return 'F'
-            if distance > 1000:
-                return 'OFF'
-
         cur_epoch = int(self._get_current_epoch())
         filter_active_indices = [
             i for i in self.indices if int(activation_epoch[i]) <= int(cur_epoch)
@@ -136,9 +119,9 @@ class ValidatorService:
         sum_distance = 0
         for n, inclusion_dist in enumerate(resp['inclusionDistances']):
             distance_int = int(inclusion_dist)
-            validator_perf[filter_active_indices[n]] = rate_inclusion_dist(distance_int)
+            validator_perf[filter_active_indices[n]] = distance_int
             sum_distance += distance_int
-        avg_perf = rate_inclusion_dist(int(round(sum_distance / len(filter_active_indices))))
+        avg_perf = int(round(sum_distance // len(filter_active_indices)))
         return {'validators': validator_perf, 'avg': avg_perf}
 
     def _get_balance(self, activation_epoch: Dict[str, str]) -> Dict:

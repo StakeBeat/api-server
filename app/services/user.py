@@ -24,3 +24,9 @@ class UserService:
             validators = session.query(Validator).filter_by(user_id=user_id)
 
         return validators
+
+    def update(self, user_id: int, payload: Dict[str, str]) -> None:
+        with SessionManager.session() as session:
+            user = session.query(User).get(user_id)
+            user.expo_token = payload['expoToken']
+            user.notification_enabled = payload['notificationEnabled']

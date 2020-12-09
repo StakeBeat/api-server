@@ -12,6 +12,7 @@ mypy==0.790
 mypy-extensions==0.4.3
 wheel==0.35.1
 pyjwt==1.7.1
+exponent-server-sdk==1.0.0
 dataclasses
 black
 

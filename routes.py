@@ -17,6 +17,15 @@ def register():
     return {'code': HTTPStatus.CREATED}
 
 
+@app.route("/api/users/edit", methods=["PUT"])
+@jwt_required()
+def edit_user():
+    payload = request.json
+    user_svc = UserService()
+    user_svc.update(current_identity.id, payload)
+    return {'code': HTTPStatus.OK}
+
+
 @app.route('/api/validators', methods=['POST'])
 @jwt_required()
 def add_validators():
