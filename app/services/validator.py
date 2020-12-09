@@ -120,7 +120,7 @@ class ValidatorService:
             if distance >= 13 <= 1000:
                 return 'F'
             if distance > 1000:
-                return 'X'
+                return 'OFF'
 
         cur_epoch = int(self._get_current_epoch())
         filter_active_indices = [
