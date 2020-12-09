@@ -56,4 +56,4 @@ def protected():
 def validators_info():
     validator_svc = ValidatorService(current_identity.id)
     info = validator_svc.info()
-    return {'code': HTTPStatus.OK, 'result': info}
+    return {'code': HTTPStatus.OK, 'validators': info}

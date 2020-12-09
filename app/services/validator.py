@@ -6,7 +6,7 @@ from app.services.user import UserService
 from app.models.validator import Validator
 from app.session import SessionManager
 from app.dataclasses.validator import ValidatorDT
-from app.utils.conversion import b64_to_hex
+from app.utils.conversion import b64_to_hex, gwei_to_ether
 
 from app import config
 
@@ -51,11 +51,55 @@ class ValidatorService:
         activation_epoch = self._get_activation_epoch()
         balances = self._get_balance(activation_epoch)
         validator_perf = self._get_validator_performance(activation_epoch)
+        balance_overtime = self._get_balance_ovetime(activation_epoch, balances['total'])
+
+        info_validator = {}
+        for i in self.indices:
+            info_validator[i] = {
+                'balance': balances['validators'][i],
+                'rating': validator_perf['validators'][i],
+            }
+
         return {
-            'balances': balances,
-            'perf': validator_perf,
-            'activation_epoch': activation_epoch,
+            'global': {
+                'balance': balances['total'],
+                'rating': validator_perf['avg'],
+                'overtime': balance_overtime,
+            },
+            'validators': info_validator,
         }
+
+    def _get_balance_ovetime(
+        self, activation_epoch: Dict[str, str], total_balance: str
+    ) -> Dict[str, str]:
+        num_validators = len(activation_epoch)
+        cur_epoch = int(self._get_current_epoch())
+        earliest_epoch = cur_epoch
+        overtime = {}
+        for epoch in activation_epoch.values():
+            if int(epoch) < int(earliest_epoch):
+                earliest_epoch = int(epoch)
+
+        if cur_epoch == earliest_epoch:
+            increment = int(cur_epoch) // 6
+            step = 0
+            for _ in range(6):
+                overtime[step] = 0
+                step += increment
+            return overtime
+
+        for _ in range(6):
+            distance_epoch = cur_epoch - earliest_epoch
+            increment = int(distance_epoch) // 6
+            balance_increment = (float(total_balance) - (num_validators * 32.00)) / 6
+
+            step = earliest_epoch
+            step_balance = 32 * num_validators
+            for _ in range(6):
+                overtime[step] = step_balance
+                step_balance += balance_increment
+                step += increment
+            return overtime
 
     def _get_validator_performance(self, activation_epoch: Dict[str, str]) -> Dict:
         """GET eth/v1alpha1/validators/performance
@@ -66,15 +110,17 @@ class ValidatorService:
             if distance == 0:
                 return '?'
             if distance == 1:
-                return 'A'
+                return 'A+'
             if distance >= 2 and distance <= 3:
                 return 'B'
             if distance >= 4 and distance <= 8:
                 return 'C'
             if distance >= 9 and distance <= 12:
                 return 'D'
-            if distance >= 13:
+            if distance >= 13 <= 1000:
                 return 'F'
+            if distance > 1000:
+                return 'X'
 
         cur_epoch = int(self._get_current_epoch())
         filter_active_indices = [
@@ -93,7 +139,7 @@ class ValidatorService:
             validator_perf[filter_active_indices[n]] = rate_inclusion_dist(distance_int)
             sum_distance += distance_int
         avg_perf = rate_inclusion_dist(int(round(sum_distance / len(filter_active_indices))))
-        return {'perf': validator_perf, 'avg': avg_perf}
+        return {'validators': validator_perf, 'avg': avg_perf}
 
     def _get_balance(self, activation_epoch: Dict[str, str]) -> Dict:
         """GET eth/v1alpha1/validator/balances
@@ -101,9 +147,11 @@ class ValidatorService:
         a) the overall balance for all validators assigned to current_user over time
         b) balance for each individual validators
         """
+        # last_n_epoch = self._get_last_n_epoch()
         cur_epoch = int(self._get_current_epoch())
         balances = {}
         balance_per_index = {i: '0' for i in self.indices}
+        # for epoch in last_n_epoch:
         total_balance_epoch, balance_per_index = self._balance_for_epoch(
             activation_epoch, cur_epoch
         )
@@ -127,8 +175,8 @@ class ValidatorService:
         balance_per_index = {}
         for json in resp['balances']:
             total_balance += int(json['balance'])
-            balance_per_index[json['index']] = json['balance']
-        return total_balance, balance_per_index
+            balance_per_index[json['index']] = gwei_to_ether(json['balance'])
+        return gwei_to_ether(total_balance), balance_per_index
 
     def _get_current_epoch(self) -> str:
         """Calculate the current epoch from genesis"""
@@ -136,16 +184,17 @@ class ValidatorService:
         current_epoch = int(sec_since_genesis / config.SEC_PER_EPOCH)
         return str(current_epoch)
 
-    # def _get_last_7d_epoch(self) -> List[str]:
-    #     pointer_epoch = int(self._get_current_epoch())
-    #     last_7d_epoch = [pointer_epoch]
-    #     for _ in range(6):
-    #         pointer_epoch = max(1, pointer_epoch - config.EPOCH_PER_DAY)
-    #         last_7d_epoch = [pointer_epoch] + last_7d_epoch
-    #         if pointer_epoch == 0:
-    #             break
+    def _get_last_n_epoch(self) -> List[str]:
+        """Fetch last 7 days epoch"""
+        pointer_epoch = int(self._get_current_epoch())
+        last_n_epoch = [pointer_epoch]
+        for _ in range(6):
+            pointer_epoch = max(1, pointer_epoch - config.EPOCH_PER_DAY)
+            last_n_epoch = [pointer_epoch] + last_n_epoch
+            if pointer_epoch == 0:
+                break
 
-    #     return last_7d_epoch
+        return last_n_epoch
 
     def _get_activation_epoch(self) -> Dict[str, str]:
         """GET /eth/v1alpha1/validators
